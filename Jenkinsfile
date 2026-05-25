@@ -1,30 +1,51 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_SERVER = "192.168.71.136"
+        DOCKER_USER   = "ubuntu"
+        APP_NAME      = "Demo-site"
+        IMAGE_NAME    = "demo-website"
+    }
+
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/akhilkt24/Demo.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Docker Image (Local Jenkins)') {
             steps {
-                bat 'docker build -t frozenyogurt-app .'
+                bat 'docker build -t demo-website .'
             }
         }
 
-        stage('Stop Old Container') {
+        stage('Manual Approval') {
             steps {
-                bat 'docker rm -f frozenyogurt || exit 0'
+                input message: "Approve Deployment to Docker Server?", ok: "Deploy"
             }
         }
 
-        stage('Run Container') {
+        stage('Deploy to Docker Server') {
             steps {
-                bat 'docker run -d -p 8080:80 --name frozenyogurt frozenyogurt-app'
+                bat """
+                ssh ubuntu@${DOCKER_SERVER} ^
+                "docker rm -f ${APP_NAME} || true && ^
+                 docker run -d -p 80:80 --name ${APP_NAME} ${IMAGE_NAME}"
+                """
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment Successful"
+        }
+
+        failure {
+            echo "Deployment Failed"
         }
     }
 }
